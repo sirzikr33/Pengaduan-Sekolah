@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('pengaduans', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignId('siswa_id')->constrained('siswas')->cascadeOnDelete();
-            $table->foreignId('kategori_id')->constrained('kategoris')->cascadeOnDelete();
+            $table->foreignUuid('siswa_id')->constrained('siswas')->cascadeOnDelete();
+            $table->foreignUuid('kategori_id')->constrained('kategoris')->cascadeOnDelete();
             $table->string('nama_barang');
             $table->string('foto_barang');
             $table->enum('status', ['pending', 'proses', 'selesai'])->default('pending');
