@@ -11,13 +11,13 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg:      #0d1117;
-            --surface: #161b22;
-            --border:  rgba(255,255,255,0.07);
-            --text:    #e6edf3;
-            --muted:   rgba(230,237,243,0.45);
-            --accent:  #3b82f6;
-            --accent-h:#2563eb;
+            --bg:      #f0f4f0;
+            --surface: #ffffff;
+            --border:  rgba(34,139,34,0.12);
+            --text:    #1a2e1a;
+            --muted:   rgba(26,46,26,0.5);
+            --accent:  #22a645;
+            --accent-h:#1a8a38;
         }
 
         body {
@@ -31,10 +31,30 @@
             color: var(--text);
         }
 
+        /* Decorative background blobs */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        body::before {
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(34,166,69,0.12) 0%, transparent 70%);
+            top: -100px; left: -100px;
+        }
+        body::after {
+            width: 350px; height: 350px;
+            background: radial-gradient(circle, rgba(22,163,74,0.08) 0%, transparent 70%);
+            bottom: -80px; right: -80px;
+        }
+
         .login-wrap {
             width: 100%;
-            max-width: 380px;
+            max-width: 390px;
             animation: slideUp 0.35s ease-out;
+            position: relative;
+            z-index: 1;
         }
         @keyframes slideUp {
             from { opacity: 0; transform: translateY(20px); }
@@ -49,11 +69,12 @@
             margin-bottom: 2rem;
         }
         .brand-icon {
-            width: 38px; height: 38px;
-            background: linear-gradient(135deg, var(--accent), #06b6d4);
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), #16a34a);
             border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(34,166,69,0.3);
         }
         .brand-icon svg { width: 20px; height: 20px; fill: #fff; }
         .brand-text { line-height: 1.2; }
@@ -64,12 +85,13 @@
         .card {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 14px;
+            border-radius: 16px;
             padding: 2rem;
+            box-shadow: 0 4px 24px rgba(34,139,34,0.08);
         }
 
         .card-title {
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--text);
             margin-bottom: 0.25rem;
@@ -89,8 +111,8 @@
             margin-bottom: 1.25rem;
         }
         .alert svg { width: 15px; height: 15px; flex-shrink: 0; }
-        .alert-success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); color: #6ee7b7; }
-        .alert-error   { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.2);  color: #fca5a5; }
+        .alert-success { background: rgba(34,166,69,0.08); border: 1px solid rgba(34,166,69,0.2); color: #166534; }
+        .alert-error   { background: rgba(220,38,38,0.07); border: 1px solid rgba(220,38,38,0.2); color: #991b1b; }
 
         /* Form */
         .form-group { margin-bottom: 1rem; }
@@ -106,7 +128,7 @@
             position: absolute;
             left: 0.8rem;
             top: 50%; transform: translateY(-50%);
-            color: rgba(230,237,243,0.25);
+            color: rgba(34,139,34,0.3);
             width: 16px; height: 16px;
             pointer-events: none;
         }
@@ -115,7 +137,7 @@
         input[type="text"] {
             width: 100%;
             padding: 0.65rem 0.875rem 0.65rem 2.5rem;
-            background: rgba(255,255,255,0.04);
+            background: #f5f8f5;
             border: 1px solid var(--border);
             border-radius: 8px;
             color: var(--text);
@@ -124,23 +146,24 @@
             transition: border-color 0.18s, box-shadow 0.18s;
             outline: none;
         }
-        input::placeholder { color: rgba(230,237,243,0.18); }
+        input::placeholder { color: rgba(26,46,26,0.25); }
         input:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+            box-shadow: 0 0 0 3px rgba(34,166,69,0.1);
+            background: #fff;
         }
-        input.is-invalid { border-color: rgba(239,68,68,0.5); }
-        .error-msg { font-size: 0.73rem; color: #fca5a5; margin-top: 0.3rem; }
+        input.is-invalid { border-color: rgba(220,38,38,0.5); }
+        .error-msg { font-size: 0.73rem; color: #dc2626; margin-top: 0.3rem; }
 
         /* Toggle password */
         .toggle-pass {
             position: absolute;
             right: 0.8rem; top: 50%; transform: translateY(-50%);
             background: none; border: none; cursor: pointer;
-            color: rgba(230,237,243,0.25); padding: 0;
+            color: rgba(34,139,34,0.3); padding: 0;
             transition: color 0.15s; line-height: 1;
         }
-        .toggle-pass:hover { color: rgba(230,237,243,0.55); }
+        .toggle-pass:hover { color: var(--accent); }
         .toggle-pass svg { width: 16px; height: 16px; }
 
         /* Remember */
@@ -160,7 +183,7 @@
         /* Button */
         .btn-login {
             width: 100%;
-            padding: 0.7rem;
+            padding: 0.75rem;
             background: var(--accent);
             color: #fff;
             border: none; border-radius: 8px;
@@ -168,18 +191,18 @@
             font-family: 'Inter', sans-serif;
             cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-            transition: background 0.15s, transform 0.1s;
-            box-shadow: 0 2px 12px rgba(59,130,246,0.3);
+            transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+            box-shadow: 0 3px 14px rgba(34,166,69,0.3);
         }
         .btn-login svg { width: 16px; height: 16px; }
-        .btn-login:hover { background: var(--accent-h); transform: translateY(-1px); }
+        .btn-login:hover { background: var(--accent-h); transform: translateY(-1px); box-shadow: 0 5px 18px rgba(34,166,69,0.35); }
         .btn-login:active { transform: translateY(0); }
         .btn-login:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
         .footer-text {
             text-align: center;
             font-size: 0.7rem;
-            color: rgba(230,237,243,0.2);
+            color: rgba(26,46,26,0.3);
             margin-top: 1.5rem;
         }
 
@@ -193,7 +216,7 @@
                 <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
             </div>
             <div class="brand-text">
-                <div class="brand-name">Aspirasi Sekolah</div>
+                <div class="brand-name">LaporinAja</div>
                 <div class="brand-sub">Sistem Pengaduan Siswa</div>
             </div>
         </div>

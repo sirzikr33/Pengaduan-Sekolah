@@ -11,7 +11,7 @@ class LoginController extends Controller
     public function index()
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return $this->redirectByRole(Auth::user());
         }
         return view('auth.login');
     }
@@ -32,8 +32,11 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
-            return redirect()->intended(route('dashboard'))
-                ->with('success', 'Selamat datang, ' . Auth::user()->name . '!');
+
+            $user = Auth::user();
+
+            return $this->redirectByRole($user)
+                ->with('success', 'Selamat datang, ' . $user->name . '!');
         }
 
         return back()
@@ -48,5 +51,16 @@ class LoginController extends Controller
         $request->session()->regenerateToken();
         return redirect()->route('login')
             ->with('success', 'Anda berhasil logout.');
+    }
+
+    /**
+     * Redirect berdasarkan role user.
+     */
+    private function redirectByRole($user)
+    {
+        return match($user->role) {
+            'siswa' => redirect()->intended(route('siswa.dashboard')),
+            default => redirect()->intended(route('dashboard')),
+        };
     }
 }

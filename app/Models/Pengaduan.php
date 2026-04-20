@@ -13,9 +13,13 @@ class Pengaduan extends Model
     protected $fillable = [
         'siswa_id',
         'kategori_id',
-        'nama_barang',
-        'foto_barang',
+        'nama_pengaduan',
+        'deskripsi',
+        'lokasi',
+        'foto_pengaduan',
         'status',
+        'catatan',
+        'kondisi_pengaduan',
         'tanggal_pengaduan',
     ];
 

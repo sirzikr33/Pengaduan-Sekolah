@@ -8,12 +8,10 @@ use App\Models\Siswa;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
         // ─── Admin ───────────────────────────────────────────
@@ -21,6 +19,8 @@ class DatabaseSeeder extends Seeder
             'name'     => 'Administrator',
             'email'    => 'admin@sekolah.sch.id',
             'password' => Hash::make('admin123'),
+            'role'     => 'admin',
+            'siswa_id' => null,
         ]);
 
         // ─── Kategori Pengaduan ───────────────────────────────
@@ -38,17 +38,28 @@ class DatabaseSeeder extends Seeder
 
         $allKategori = Kategori::all();
 
-        // ─── Siswa ────────────────────────────────────────────
-        $siswas = [
-            ['nisn' => '0123456789', 'nama' => 'Ahmad Fauzan',     'kelas' => 'X RPL 1'],
-            ['nisn' => '0123456790', 'nama' => 'Siti Rahmawati',   'kelas' => 'X RPL 2'],
-            ['nisn' => '0123456791', 'nama' => 'Budi Santoso',     'kelas' => 'XI TKJ 1'],
-            ['nisn' => '0123456792', 'nama' => 'Dewi Lestari',     'kelas' => 'XI TKJ 2'],
-            ['nisn' => '0123456793', 'nama' => 'Rizky Pratama',    'kelas' => 'XII MM 1'],
+        // ─── Siswa + User siswa ───────────────────────────────
+        $siswaDatas = [
+            ['nisn' => '0123456789', 'nama' => 'Zikra Malik',   'kelas' => 'X RPL 1'],
+            ['nisn' => '0123456790', 'nama' => 'Siti Rahmawati', 'kelas' => 'X RPL 2'],
+            ['nisn' => '0123456791', 'nama' => 'Budi Santoso',   'kelas' => 'XI TKJ 1'],
+            ['nisn' => '0123456792', 'nama' => 'Dewi Lestari',   'kelas' => 'XI TKJ 2'],
+            ['nisn' => '0123456793', 'nama' => 'Rizky Pratama',  'kelas' => 'XII MM 1'],
         ];
 
-        foreach ($siswas as $sw) {
-            Siswa::create($sw);
+        foreach ($siswaDatas as $sw) {
+            $siswa = Siswa::create($sw);
+
+            // Buat email dari nama: "Ahmad Fauzan" → "ahmad.fauzan@siswa.sch.id"
+            $email = strtolower(str_replace(' ', '.', $sw['nama'])) . '@siswa.sch.id';
+
+            User::create([
+                'name'     => $sw['nama'],
+                'email'    => $email,
+                'password' => Hash::make('siswa123'),
+                'role'     => 'siswa',
+                'siswa_id' => $siswa->id,
+            ]);
         }
 
         $allSiswa = Siswa::all();
@@ -56,34 +67,49 @@ class DatabaseSeeder extends Seeder
         // ─── Pengaduan ────────────────────────────────────────
         $pengaduans = [
             [
-                'nama_barang'      => 'Kursi Rusak',
-                'foto_barang'      => 'kursi_rusak.jpg',
-                'status'           => 'pending',
-                'tanggal_pengaduan'=> '2026-04-01',
+                'nama_pengaduan'    => 'Kursi Rusak',
+                'foto_pengaduan'    => 'no-image.jpg',
+                'status'            => 'pending',
+                'deskripsi'         => 'Kursi di kelas 101 rusak dan tidak dapat digunakan.',
+                'lokasi'            => 'Kelas 101',
+                'kondisi_pengaduan' => 'sedang',
+                'tanggal_pengaduan' => '2026-04-01',
             ],
             [
-                'nama_barang'      => 'Proyektor Tidak Menyala',
-                'foto_barang'      => 'proyektor.jpg',
-                'status'           => 'proses',
-                'tanggal_pengaduan'=> '2026-04-03',
+                'nama_pengaduan'    => 'Proyektor Tidak Menyala',
+                'foto_pengaduan'    => 'no-image.jpg',
+                'status'            => 'proses',
+                'deskripsi'         => 'Proyektor di ruang guru tidak menyala.',
+                'lokasi'            => 'Ruang Guru',
+                'kondisi_pengaduan' => 'berat',
+                'tanggal_pengaduan' => '2026-04-03',
             ],
             [
-                'nama_barang'      => 'Kaca Jendela Pecah',
-                'foto_barang'      => 'kaca_pecah.jpg',
-                'status'           => 'selesai',
-                'tanggal_pengaduan'=> '2026-03-28',
+                'nama_pengaduan'    => 'Kaca Jendela Pecah',
+                'foto_pengaduan'    => 'no-image.jpg',
+                'status'            => 'selesai',
+                'deskripsi'         => 'Kaca jendela di kelas 202 pecah akibat angin kencang.',
+                'lokasi'            => 'Kelas 202',
+                'kondisi_pengaduan' => 'berat',
+                'tanggal_pengaduan' => '2026-03-28',
             ],
             [
-                'nama_barang'      => 'Bola Voli Kempes',
-                'foto_barang'      => 'bola_voli.jpg',
-                'status'           => 'pending',
-                'tanggal_pengaduan'=> '2026-04-05',
+                'nama_pengaduan'    => 'Bola Voli Kempes',
+                'foto_pengaduan'    => 'no-image.jpg',
+                'status'            => 'pending',
+                'deskripsi'         => 'Bola voli di lapangan olahraga kempes dan tidak bisa dipakai.',
+                'lokasi'            => 'Lapangan Olahraga',
+                'kondisi_pengaduan' => 'ringan',
+                'tanggal_pengaduan' => '2026-04-05',
             ],
             [
-                'nama_barang'      => 'Komputer Lab Error',
-                'foto_barang'      => 'komputer_lab.jpg',
-                'status'           => 'proses',
-                'tanggal_pengaduan'=> '2026-04-07',
+                'nama_pengaduan'    => 'Komputer Lab Error',
+                'foto_pengaduan'    => 'no-image.jpg',
+                'status'            => 'proses',
+                'deskripsi'         => 'Salah satu komputer di laboratorium komputer sering error saat digunakan.',
+                'lokasi'            => 'Laboratorium Komputer',
+                'kondisi_pengaduan' => 'sedang',
+                'tanggal_pengaduan' => '2026-04-07',
             ],
         ];
 
@@ -94,8 +120,19 @@ class DatabaseSeeder extends Seeder
             ]));
         }
 
+        $this->command->info('');
         $this->command->info('✅ Seeder selesai!');
-        $this->command->info('   Email : admin@sekolah.sch.id');
-        $this->command->info('   Pass  : admin123');
+        $this->command->info('');
+        $this->command->info('  👤 ADMIN');
+        $this->command->info('     Email : admin@sekolah.sch.id');
+        $this->command->info('     Pass  : admin123');
+        $this->command->info('');
+        $this->command->info('  🎓 SISWA (semua password: siswa123)');
+        $this->command->info('     zikra.malik@siswa.sch.id');
+        $this->command->info('     siti.rahmawati@siswa.sch.id');
+        $this->command->info('     budi.santoso@siswa.sch.id');
+        $this->command->info('     dewi.lestari@siswa.sch.id');
+        $this->command->info('     rizky.pratama@siswa.sch.id');
+        $this->command->info('');
     }
 }

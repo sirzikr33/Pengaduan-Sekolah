@@ -15,9 +15,13 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('siswa_id')->constrained('siswas')->cascadeOnDelete();
             $table->foreignUuid('kategori_id')->constrained('kategoris')->cascadeOnDelete();
-            $table->string('nama_barang');
-            $table->string('foto_barang');
+            $table->string('nama_pengaduan');
+            $table->text('deskripsi');
+            $table->string('lokasi');
+            $table->string('foto_pengaduan');
             $table->enum('status', ['pending', 'proses', 'selesai'])->default('pending');
+            $table->text('catatan')->nullable();
+            $table->enum('kondisi_pengaduan', ['berat', 'sedang', 'ringan']);
             $table->date('tanggal_pengaduan');
             $table->timestamps();
             
