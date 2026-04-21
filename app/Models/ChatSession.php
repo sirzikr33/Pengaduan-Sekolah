@@ -20,13 +20,38 @@ class ChatSession extends Model
         'queued_at',
         'accepted_at',
         'resolved_at',
+        'payload_data',
+        'photo_path',
     ];
 
     protected $casts = [
         'queued_at'    => 'datetime',
         'accepted_at'  => 'datetime',
         'resolved_at'  => 'datetime',
+        'payload_data' => 'array',
     ];
+
+    // ── Payload Helpers (menggantikan cache()) ──
+
+    /** Simpan satu key ke payload_data di database */
+    public function setPayload(string $key, mixed $value): void
+    {
+        $payload = $this->payload_data ?? [];
+        $payload[$key] = $value;
+        $this->update(['payload_data' => $payload]);
+    }
+
+    /** Ambil satu key dari payload_data */
+    public function getPayload(string $key, mixed $default = null): mixed
+    {
+        return ($this->payload_data ?? [])[$key] ?? $default;
+    }
+
+    /** Hapus seluruh payload_data dan photo_path */
+    public function clearPayload(): void
+    {
+        $this->update(['payload_data' => null, 'photo_path' => null]);
+    }
 
     // ── Status helpers ──
 

@@ -159,6 +159,41 @@
         pointer-events: none;
     }
 
+    /* Chip setelah pilihan dipilih — menggantikan tombol */
+    .msg-chosen-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-top: 0.5rem;
+        padding: 0.3rem 0.75rem;
+        background: var(--accent);
+        color: #fff;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        pointer-events: none;
+        opacity: 0.9;
+    }
+
+    /* Chip read-only untuk opsi lama (bukan pesan terbaru) */
+    .msg-options-archive {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        margin-top: 0.5rem;
+    }
+    .msg-option-chip-ro {
+        display: inline-block;
+        padding: 0.25rem 0.6rem;
+        background: rgba(26,46,26,0.06);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        font-size: 0.73rem;
+        pointer-events: none;
+        cursor: default;
+    }
+
     /* ── Typing indicator ── */
     .typing-indicator {
         display: none;
@@ -238,7 +273,73 @@
     }
     .chat-btn-upload:hover { background: var(--accent-lt); color: var(--accent); border-color: rgba(34,166,69,0.3); }
 
-    /* ── Welcome Screen ── */
+    /* ── Photo Preview Bar (di atas input, seperti AI) ── */
+    .photo-preview-bar {
+        display: none;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 1rem 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+    .photo-preview-bar.show { display: flex; }
+    .photo-preview-thumb {
+        position: relative;
+        width: 60px; height: 60px;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 2px solid var(--accent);
+        flex-shrink: 0;
+    }
+    .photo-preview-thumb img {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .photo-preview-remove {
+        position: absolute; top: 2px; right: 2px;
+        width: 18px; height: 18px;
+        background: rgba(220,38,38,0.85);
+        border: none; border-radius: 50%;
+        color: #fff; font-size: 11px; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        line-height: 1;
+    }
+    .photo-preview-hint { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Resolved Bar (muncul setelah selesai/batal) ── */
+    .chat-resolved-bar {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 1rem 1.25rem;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+    .chat-resolved-bar.show { display: flex; }
+    .chat-resolved-bar p { font-size: 0.8rem; color: var(--muted); margin: 0; }
+    .btn-new-pengaduan {
+        padding: 0.65rem 1.5rem;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 24px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 14px rgba(34,166,69,0.25);
+        transition: all 0.18s;
+    }
+    .btn-new-pengaduan:hover { background: var(--accent-h); transform: translateY(-1px); }
+    .btn-new-pengaduan svg { width: 16px; height: 16px; fill: currentColor; }
+
     .chat-welcome {
         flex: 1;
         display: flex;
@@ -363,6 +464,10 @@
             <p id="chatStatus">Siap membantu kamu</p>
         </div>
         <div class="chat-header-actions">
+            <button onclick="window.location.href='{{ route('siswa.chat.history') }}'" title="Lihat riwayat chat lama">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="width:14px;height:14px;margin-right:2px;"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                Riwayat
+            </button>
             <button onclick="startNewChat()" id="btnNewChat" title="Mulai chat baru">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="width:14px;height:14px;margin-right:2px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 Baru
@@ -402,6 +507,15 @@
         <div class="typing-dot"></div>
     </div>
 
+    <!-- Photo Preview Bar -->
+    <div class="photo-preview-bar" id="photoPreviewBar">
+        <div class="photo-preview-thumb" id="photoPreviewThumb">
+            <img id="photoPreviewImg" src="" alt="Preview">
+            <button class="photo-preview-remove" onclick="clearPhotoPreview()" title="Hapus foto">✕</button>
+        </div>
+        <span class="photo-preview-hint">📷 Foto siap dikirim — tekan ➤ untuk mengirim</span>
+    </div>
+
     <!-- Input Area -->
     <div class="chat-input-area" id="chatInputArea" style="{{ !$session ? 'display:none;' : '' }}">
         <button class="chat-btn chat-btn-camera" onclick="openCamera()" title="Ambil foto">
@@ -410,10 +524,19 @@
         <button class="chat-btn chat-btn-upload" onclick="document.getElementById('fileInput').click()" title="Upload gambar">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
         </button>
-        <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileUpload(this)">
+        <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(this)">
         <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeydown="if(event.key==='Enter')sendChatMessage()">
         <button class="chat-btn chat-btn-send" onclick="sendChatMessage()" id="btnSend">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+    </div>
+
+    <!-- Resolved Bar (muncul otomatis setelah selesai/batal) -->
+    <div class="chat-resolved-bar" id="chatResolvedBar">
+        <p>Pengaduan telah selesai atau dibatalkan.</p>
+        <button class="btn-new-pengaduan" onclick="startNewChat()">
+            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Buat Pengaduan Baru
         </button>
     </div>
 </div>
@@ -469,9 +592,12 @@
             const data = await res.json();
             if (data.success) {
                 sessionId = data.session_id;
+                // Reset UI
                 document.getElementById('chatWelcome').style.display = 'none';
                 document.getElementById('chatMessages').style.display = 'flex';
                 document.getElementById('chatInputArea').style.display = 'flex';
+                document.getElementById('chatResolvedBar').classList.remove('show');
+                clearPhotoPreview();
                 document.getElementById('chatMessages').innerHTML = '';
                 renderMessages(data.messages);
                 startPolling();
@@ -479,19 +605,75 @@
         } catch (e) { console.error(e); }
     }
 
-    // ── Send Message ──
+    // ── Photo Preview State ──
+    let pendingPhotoFile = null;   // File object menunggu dikirim
+    let pendingPhotoBlob = null;   // Blob dari kamera menunggu dikirim
+
+    function handleFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        pendingPhotoFile = file;
+        pendingPhotoBlob = null;
+        // Tampilkan preview di bar (bukan langsung upload)
+        const reader = new FileReader();
+        reader.onload = e => showPhotoPreview(e.target.result);
+        reader.readAsDataURL(file);
+        input.value = ''; // reset input supaya bisa pilih file sama lagi
+    }
+
+    function showPhotoPreview(dataUrl) {
+        document.getElementById('photoPreviewImg').src = dataUrl;
+        document.getElementById('photoPreviewBar').classList.add('show');
+        document.getElementById('chatInput').placeholder = 'Tambah pesan (opsional)...';
+    }
+
+    function clearPhotoPreview() {
+        pendingPhotoFile = null;
+        pendingPhotoBlob = null;
+        document.getElementById('photoPreviewImg').src = '';
+        document.getElementById('photoPreviewBar').classList.remove('show');
+        document.getElementById('chatInput').placeholder = 'Ketik pesan...';
+    }
+
+    // ── Send Message (juga kirim foto jika ada) ──
     async function sendChatMessage() {
         const input = document.getElementById('chatInput');
-        const msg = input.value.trim();
-        if (!msg || !sessionId) return;
+        const msg   = input.value.trim();
+        const hasPhoto = pendingPhotoFile || pendingPhotoBlob;
+
+        if (!msg && !hasPhoto) return;
+        if (!sessionId) return;
 
         input.value = '';
-
-        // Find current step from last bot options message
         const step = currentStep;
 
-        showTyping();
+        // Jika ada foto pending, upload dulu lalu kirim pesan
+        if (hasPhoto) {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            if (pendingPhotoBlob) {
+                formData.append('photo', pendingPhotoBlob, 'camera_' + Date.now() + '.jpg');
+            } else {
+                formData.append('photo', pendingPhotoFile);
+            }
+            clearPhotoPreview();
+            showTyping();
+            try {
+                const res = await fetch(ROUTES.uploadPhoto, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': CSRF },
+                    body: formData,
+                });
+                const data = await res.json();
+                hideTyping();
+                if (data.bot_messages) renderMessages(data.bot_messages);
+                loadMessages();
+            } catch (e) { hideTyping(); console.error(e); }
+            return; // Foto sudah dikirim, stop di sini
+        }
 
+        // Kirim pesan teks biasa
+        showTyping();
         try {
             const res = await fetch(ROUTES.send, {
                 method: 'POST',
@@ -500,29 +682,20 @@
             });
             const data = await res.json();
             hideTyping();
-            if (data.messages) {
-                renderMessages(data.messages);
-            }
-            // Reload all messages to keep in sync
+            if (data.messages) renderMessages(data.messages);
             loadMessages();
-        } catch (e) {
-            hideTyping();
-            console.error(e);
-        }
+        } catch (e) { hideTyping(); console.error(e); }
     }
 
     // ── Select Option ──
     async function selectOption(step, value, label, btnEl) {
-        // Disable all buttons in this group
-        const parent = btnEl.closest('.msg-options');
-        if (parent) {
-            parent.querySelectorAll('.msg-option-btn').forEach(b => {
-                b.classList.remove('selected');
-                b.style.pointerEvents = 'none';
-                b.style.opacity = '0.5';
-            });
-            btnEl.classList.add('selected');
-            btnEl.style.opacity = '1';
+        // Ganti seluruh .msg-options dengan chip read-only pilihan terpilih
+        const optionsWrap = btnEl.closest('.msg-options');
+        if (optionsWrap) {
+            const chip = document.createElement('div');
+            chip.className = 'msg-chosen-chip';
+            chip.textContent = '✔ ' + label;
+            optionsWrap.replaceWith(chip);
         }
 
         showTyping();
@@ -551,17 +724,10 @@
         }
     }
 
-    // ── Upload Photo ──
-    async function handleFileUpload(input) {
-        const file = input.files[0];
-        if (!file || !sessionId) return;
-
-        const formData = new FormData();
-        formData.append('session_id', sessionId);
-        formData.append('photo', file);
-
+    // ── Upload Photo (digantikan oleh handleFileSelect + sendChatMessage) ──
+    // Fungsi ini dipertahankan hanya untuk kamera (capturePhoto), tidak untuk file input
+    async function uploadPhotoNow(formData) {
         showTyping();
-
         try {
             const res = await fetch(ROUTES.uploadPhoto, {
                 method: 'POST',
@@ -570,16 +736,9 @@
             });
             const data = await res.json();
             hideTyping();
-            if (data.bot_messages) {
-                renderMessages(data.bot_messages);
-            }
+            if (data.bot_messages) renderMessages(data.bot_messages);
             loadMessages();
-        } catch (e) {
-            hideTyping();
-            console.error(e);
-        }
-
-        input.value = '';
+        } catch (e) { hideTyping(); console.error(e); }
     }
 
     // ── Camera ──
@@ -610,29 +769,13 @@
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
 
-        canvas.toBlob(async (blob) => {
+        canvas.toBlob(blob => {
             closeCamera();
-            const formData = new FormData();
-            formData.append('session_id', sessionId);
-            formData.append('photo', blob, 'camera_' + Date.now() + '.jpg');
-
-            showTyping();
-            try {
-                const res = await fetch(ROUTES.uploadPhoto, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': CSRF },
-                    body: formData,
-                });
-                const data = await res.json();
-                hideTyping();
-                if (data.bot_messages) {
-                    renderMessages(data.bot_messages);
-                }
-                loadMessages();
-            } catch (e) {
-                hideTyping();
-                console.error(e);
-            }
+            // Tampilkan preview di bar, jangan langsung upload
+            pendingPhotoBlob = blob;
+            pendingPhotoFile = null;
+            const url = URL.createObjectURL(blob);
+            showPhotoPreview(url);
         }, 'image/jpeg', 0.85);
     }
 
@@ -677,9 +820,16 @@
                 } else if (data.status === 'resolved') {
                     document.getElementById('chatStatus').textContent = 'Chat selesai';
                     document.getElementById('queueBanner').style.display = 'none';
+                    // ✔ Sembunyikan input, tampilkan tombol Pengaduan Baru
+                    document.getElementById('chatInputArea').style.display = 'none';
+                    document.getElementById('photoPreviewBar').classList.remove('show');
+                    document.getElementById('chatResolvedBar').classList.add('show');
                 } else {
                     document.getElementById('queueBanner').style.display = 'none';
                     document.getElementById('chatStatus').textContent = 'Siap membantu kamu';
+                    // Pastikan input terlihat jika session masih aktif
+                    document.getElementById('chatInputArea').style.display = 'flex';
+                    document.getElementById('chatResolvedBar').classList.remove('show');
                 }
 
                 // Track last message time
@@ -721,8 +871,18 @@
     function renderMessages(messages) {
         const container = document.getElementById('chatMessages');
 
+        // Cari ID pesan bot terakhir yang punya opsi — hanya itu yang tampilkan tombol aktif
+        let lastBotOptionMsgId = null;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m.sender_type === 'bot' && m.metadata && m.metadata.type === 'options') {
+                lastBotOptionMsgId = m.id;
+                break;
+            }
+        }
+
         messages.forEach(msg => {
-            // Skip if message already rendered
+            // Skip jika sudah dirender
             if (document.getElementById('msg-' + msg.id)) return;
 
             const div = document.createElement('div');
@@ -730,12 +890,12 @@
             div.id = 'msg-' + msg.id;
 
             const avatarLabel = msg.sender_type === 'bot' ? '🤖' :
-                                msg.sender_type === 'admin' ? '👨‍💼' :
+                                msg.sender_type === 'admin' ? '👨\u200d💼' :
                                 '{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}';
 
             let bubbleContent = '';
 
-            // Format message text
+            // Format teks pesan
             if (msg.message && msg.message !== '__SELECT_KATEGORI__') {
                 let text = msg.message
                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -748,23 +908,41 @@
                 bubbleContent += `<br><img class="chat-photo" src="/storage/${msg.attachment}" alt="Foto" onclick="showPhoto('/storage/${msg.attachment}')">`;
             }
 
-            // Track currentStep from ANY bot message with metadata.step
+            // Track currentStep dari pesan bot
             if (msg.metadata && msg.metadata.step) {
                 currentStep = msg.metadata.step;
             }
 
-            // Options buttons
+            // Opsi: tampilkan tombol HANYA untuk pesan bot opsi paling baru
+            // Pesan bot opsi lama hanya tampilkan chip read-only
             if (msg.metadata && msg.metadata.type === 'options' && msg.metadata.options) {
-                bubbleContent += '<div class="msg-options">';
-                msg.metadata.options.forEach(opt => {
-                    bubbleContent += `<button class="msg-option-btn" onclick="selectOption('${msg.metadata.step}', '${opt.id}', '${opt.label.replace(/'/g, "\\'")}', this)">${opt.label}</button>`;
-                });
-                bubbleContent += '</div>';
+                if (msg.id === lastBotOptionMsgId) {
+                    // Pesan terbaru → tampilkan tombol aktif
+                    bubbleContent += '<div class="msg-options">';
+                    msg.metadata.options.forEach(opt => {
+                        bubbleContent += `<button class="msg-option-btn" onclick="selectOption('${msg.metadata.step}', '${opt.id}', '${opt.label.replace(/'/g, "\\'")}', this)">${opt.label}</button>`;
+                    });
+                    bubbleContent += '</div>';
+                } else {
+                    // Pesan lama → tampilkan chip read-only (tidak bisa diklik)
+                    bubbleContent += '<div class="msg-options-archive">';
+                    msg.metadata.options.forEach(opt => {
+                        bubbleContent += `<span class="msg-option-chip-ro">${opt.label}</span>`;
+                    });
+                    bubbleContent += '</div>';
+                }
             }
 
-            // Time
-            const time = new Date(msg.created_at);
-            const timeStr = time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            // Time — pastikan dibaca sebagai UTC lalu dikonversi ke WIB
+            // Laravel mengirim "2026-04-20 16:04:10" (tanpa 'Z'), tambahkan ' UTC' agar
+            // new Date() tidak salah membaca sebagai waktu lokal
+            const rawTs = msg.created_at.includes('T') ? msg.created_at : msg.created_at.replace(' ', 'T');
+            const utcTs  = rawTs.endsWith('Z') || rawTs.includes('+') ? rawTs : rawTs + 'Z';
+            const time    = new Date(utcTs);
+            const timeStr = time.toLocaleTimeString('id-ID', {
+                hour: '2-digit', minute: '2-digit',
+                timeZone: 'Asia/Jakarta'
+            });
 
             div.innerHTML = `
                 <div class="msg-avatar">${avatarLabel}</div>
@@ -777,7 +955,7 @@
             container.appendChild(div);
         });
 
-        // Scroll to bottom
+        // Scroll ke bawah
         container.scrollTop = container.scrollHeight;
     }
 

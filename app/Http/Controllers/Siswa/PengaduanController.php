@@ -101,7 +101,7 @@ class PengaduanController extends Controller
             abort(403, 'Pengaduan ini bukan milik Anda.');
         }
 
-        $pengaduan->load('kategori');
+        $pengaduan->load('kategori', 'chatSession');
         return view('siswa.pengaduan.show', compact('pengaduan', 'siswa'));
     }
 }

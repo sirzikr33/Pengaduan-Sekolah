@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pengaduan extends Model
 {
@@ -35,5 +36,10 @@ class Pengaduan extends Model
     public function kategori(): BelongsTo
     {
         return $this->belongsTo(Kategori::class);
+    }
+
+    public function chatSession(): HasOne
+    {
+        return $this->hasOne(ChatSession::class, 'pengaduan_id');
     }
 }

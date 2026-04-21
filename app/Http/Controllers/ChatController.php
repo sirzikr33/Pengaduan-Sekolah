@@ -31,6 +31,42 @@ class ChatController extends Controller
     }
 
     /**
+     * Show list of resolved (history) chat sessions for the logged-in siswa.
+     */
+    public function history()
+    {
+        $user = Auth::user();
+
+        $histories = ChatSession::where('user_id', $user->id)
+            ->where('status', 'resolved')
+            ->with(['pengaduan.kategori', 'messages' => function ($q) {
+                $q->orderBy('created_at')->limit(1);
+            }])
+            ->withCount('messages')
+            ->latest('resolved_at')
+            ->paginate(10);
+
+        return view('siswa.chat.history', compact('histories'));
+    }
+
+    /**
+     * Show a single resolved chat session in read-only mode.
+     */
+    public function showHistory(ChatSession $chatSession)
+    {
+        $user = Auth::user();
+
+        // Hanya bisa lihat history milik sendiri
+        if ($chatSession->user_id !== $user->id) {
+            abort(403, 'Sesi chat ini bukan milik Anda.');
+        }
+
+        $chatSession->load(['pengaduan.kategori', 'messages', 'admin']);
+
+        return view('siswa.chat.history_show', compact('chatSession'));
+    }
+
+    /**
      * Start a new chat session.
      */
     public function startSession(Request $request)
@@ -140,7 +176,16 @@ class ChatController extends Controller
             ->where('user_id', $user->id)
             ->firstOrFail();
 
+        // Hapus foto lama di storage jika sudah ada (replace)
+        $oldPath = $session->photo_path;
+        if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
         $path = $request->file('photo')->store('chat_photos', 'public');
+
+        // Simpan path foto ke session (database), bukan cache
+        $session->update(['photo_path' => $path]);
 
         $msg = ChatMessage::create([
             'chat_session_id' => $session->id,
@@ -159,15 +204,12 @@ class ChatController extends Controller
 
         $botMessages = [];
         if ($lastBotMsg && $lastBotMsg->metadata && ($lastBotMsg->metadata['step'] ?? '') === 'foto') {
-            // Store photo path in session metadata for later
-            $session->update(['photo_path' => $path]);
-
             $botMessages = $this->processBotStep($session, 'foto_received', $path);
         }
 
         return response()->json([
-            'success'  => true,
-            'message'  => $msg,
+            'success'      => true,
+            'message'      => $msg,
             'bot_messages' => $botMessages,
         ]);
     }
@@ -249,9 +291,9 @@ class ChatController extends Controller
                     $messages[] = $this->botMsg($session, "❌ Kategori tidak valid. Silakan pilih dari opsi yang tersedia.");
                     break;
                 }
-                // Store in session temp data
-                cache()->put("chat_{$session->id}_kategori", $value, 3600);
-                cache()->put("chat_{$session->id}_kategori_nama", $kategori->nama_kategori, 3600);
+                // Simpan ke database (payload_data), bukan cache
+                $session->setPayload('kategori', $value);
+                $session->setPayload('kategori_nama', $kategori->nama_kategori);
 
                 $messages[] = $this->botMsg($session, "✅ Kategori: {$kategori->nama_kategori}\n\nBaik, sekarang tuliskan judul/nama pengaduan kamu.\nContoh: \"Kursi kelas X rusak\" atau \"AC Lab tidak dingin\"");
                 $messages[count($messages) - 1]->metadata = ['step' => 'nama'];
@@ -265,7 +307,7 @@ class ChatController extends Controller
                     $messages[count($messages) - 1]->save();
                     break;
                 }
-                cache()->put("chat_{$session->id}_nama", $value, 3600);
+                $session->setPayload('nama', $value);
 
                 $messages[] = $this->botMsg($session, "📝 Judul: \"{$value}\"\n\nSekarang jelaskan detail permasalahannya. Tulis sejelas mungkin ya:");
                 $messages[count($messages) - 1]->metadata = ['step' => 'deskripsi'];
@@ -279,7 +321,7 @@ class ChatController extends Controller
                     $messages[count($messages) - 1]->save();
                     break;
                 }
-                cache()->put("chat_{$session->id}_deskripsi", $value, 3600);
+                $session->setPayload('deskripsi', $value);
 
                 $messages[] = $this->botMsg($session, "📍 Sekarang, di mana lokasi kejadiannya?\nContoh: \"Lab Komputer\", \"Ruang Kelas X RPL 1\", \"Kantin\"");
                 $messages[count($messages) - 1]->metadata = ['step' => 'lokasi'];
@@ -293,7 +335,7 @@ class ChatController extends Controller
                     $messages[count($messages) - 1]->save();
                     break;
                 }
-                cache()->put("chat_{$session->id}_lokasi", $value, 3600);
+                $session->setPayload('lokasi', $value);
 
                 $messages[] = $this->botMsg($session, "⚠️ Seberapa parah kondisi masalahnya?", ['type' => 'options', 'step' => 'kondisi', 'options' => [
                     ['id' => 'ringan', 'label' => '🟢 Ringan'],
@@ -307,7 +349,7 @@ class ChatController extends Controller
                     $messages[] = $this->botMsg($session, "❌ Pilihan tidak valid. Pilih salah satu: Ringan, Sedang, atau Berat.");
                     break;
                 }
-                cache()->put("chat_{$session->id}_kondisi", $value, 3600);
+                $session->setPayload('kondisi', $value);
 
                 $messages[] = $this->botMsg($session, "📷 Apakah kamu ingin melampirkan foto bukti?", ['type' => 'options', 'step' => 'ask_foto', 'options' => [
                     ['id' => 'ya',    'label' => '📷 Ya, lampirkan foto'],
@@ -319,13 +361,15 @@ class ChatController extends Controller
                 if ($value === 'ya') {
                     $messages[] = $this->botMsg($session, "📷 Silakan kirim foto bukti kamu. Kamu bisa menggunakan tombol kamera 📸 atau upload file gambar.", ['step' => 'foto']);
                 } else {
-                    cache()->put("chat_{$session->id}_foto", null, 3600);
+                    // Siswa tidak mau foto — pastikan photo_path bersih
+                    $session->update(['photo_path' => null]);
                     $messages = array_merge($messages, $this->showConfirmation($session));
                 }
                 break;
 
             case 'foto_received':
-                cache()->put("chat_{$session->id}_foto", $value, 3600);
+                // value = path foto yang baru saja diupload
+                // photo_path di session sudah diupdate di uploadPhoto()
                 $messages[] = $this->botMsg($session, "✅ Foto berhasil diterima!");
                 $messages = array_merge($messages, $this->showConfirmation($session));
                 break;
@@ -334,8 +378,12 @@ class ChatController extends Controller
                 if ($value === 'kirim') {
                     $messages = array_merge($messages, $this->submitPengaduan($session));
                 } elseif ($value === 'batal') {
-                    // Clean up
-                    $this->clearCacheForSession($session);
+                    // FIX #2: Hapus file foto fisik dari storage sebelum clear payload
+                    $fotoPath = $session->photo_path;
+                    if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
+                        Storage::disk('public')->delete($fotoPath);
+                    }
+                    $session->clearPayload();
                     $session->update(['status' => 'resolved', 'resolved_at' => now()]);
                     $messages[] = $this->botMsg($session, "❌ Pengaduan dibatalkan.\n\nJika kamu ingin membuat pengaduan baru, silakan mulai chat baru.");
                 } else {
@@ -380,12 +428,13 @@ class ChatController extends Controller
 
     private function showConfirmation(ChatSession $session): array
     {
-        $nama     = cache("chat_{$session->id}_nama", '-');
-        $kategori = cache("chat_{$session->id}_kategori_nama", '-');
-        $deskripsi = cache("chat_{$session->id}_deskripsi", '-');
-        $lokasi   = cache("chat_{$session->id}_lokasi", '-');
-        $kondisi  = cache("chat_{$session->id}_kondisi", '-');
-        $foto     = cache("chat_{$session->id}_foto");
+        // Baca dari payload_data di database (bukan cache)
+        $nama      = $session->getPayload('nama', '-');
+        $kategori  = $session->getPayload('kategori_nama', '-');
+        $deskripsi = $session->getPayload('deskripsi', '-');
+        $lokasi    = $session->getPayload('lokasi', '-');
+        $kondisi   = $session->getPayload('kondisi', '-');
+        $foto      = $session->photo_path; // disimpan di kolom khusus
 
         $summary  = "📋 **Ringkasan Pengaduan**\n\n";
         $summary .= "📌 Judul: {$nama}\n";
@@ -410,31 +459,35 @@ class ChatController extends Controller
         $user  = Auth::user();
         $siswa = $user->siswa;
 
-        $fotoPath = cache("chat_{$session->id}_foto");
+        // Baca dari payload_data di database
+        $fotoPath = $session->photo_path;
         $fotoName = $fotoPath ? basename($fotoPath) : 'no-image.jpg';
 
-        // If foto was in chat_photos, move to pengaduan folder
+        // Jika foto ada di chat_photos, salin ke folder pengaduan
         if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
             $newPath = 'pengaduan/' . basename($fotoPath);
             Storage::disk('public')->copy($fotoPath, $newPath);
+            // Hapus file asli di chat_photos setelah disalin
+            Storage::disk('public')->delete($fotoPath);
             $fotoName = basename($fotoPath);
         }
 
         $pengaduan = Pengaduan::create([
             'siswa_id'          => $siswa->id,
-            'kategori_id'       => cache("chat_{$session->id}_kategori"),
-            'nama_pengaduan'    => cache("chat_{$session->id}_nama"),
-            'deskripsi'         => cache("chat_{$session->id}_deskripsi"),
-            'lokasi'            => cache("chat_{$session->id}_lokasi"),
+            'kategori_id'       => $session->getPayload('kategori'),
+            'nama_pengaduan'    => $session->getPayload('nama'),
+            'deskripsi'         => $session->getPayload('deskripsi'),
+            'lokasi'            => $session->getPayload('lokasi'),
             'foto_pengaduan'    => $fotoName,
             'status'            => 'pending',
-            'kondisi_pengaduan' => cache("chat_{$session->id}_kondisi"),
+            'kondisi_pengaduan' => $session->getPayload('kondisi'),
             'tanggal_pengaduan' => now()->toDateString(),
         ]);
 
         $session->update(['pengaduan_id' => $pengaduan->id]);
 
-        $this->clearCacheForSession($session);
+        // Bersihkan payload (foto sudah dipindahkan, data draf sudah dipakai)
+        $session->clearPayload();
 
         $messages = [];
         $messages[] = $this->botMsg($session, "🎉 **Pengaduan berhasil dikirim!**\n\n📋 ID: #{$pengaduan->id}\n📌 Status: Pending\n\nTerima kasih sudah melapor. Admin akan segera meninjau pengaduan kamu.\n\nApa yang ingin kamu lakukan selanjutnya?", [
@@ -459,9 +512,7 @@ class ChatController extends Controller
 
     private function clearCacheForSession(ChatSession $session): void
     {
-        $keys = ['kategori', 'kategori_nama', 'nama', 'deskripsi', 'lokasi', 'kondisi', 'foto'];
-        foreach ($keys as $key) {
-            cache()->forget("chat_{$session->id}_{$key}");
-        }
+        // Metode ini sekarang wrap clearPayload() untuk backward compatibility
+        $session->clearPayload();
     }
 }

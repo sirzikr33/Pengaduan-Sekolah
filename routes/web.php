@@ -72,5 +72,7 @@ Route::middleware(['auth', 'role:siswa'])
         Route::post('/upload-photo',[ChatController::class, 'uploadPhoto'])->name('upload-photo');
         Route::get('/messages',     [ChatController::class, 'getMessages'])->name('messages');
         Route::post('/escalate',    [ChatController::class, 'escalate'])->name('escalate');
+        Route::get('/history',              [ChatController::class, 'history'])->name('history');
+        Route::get('/history/{chatSession}',[ChatController::class, 'showHistory'])->name('history.show');
     });
 });

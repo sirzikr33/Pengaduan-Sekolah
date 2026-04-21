@@ -10,7 +10,7 @@
             <div class="section-title">Riwayat Pengaduan</div>
             <div class="section-sub">{{ $pengaduans->total() }} pengaduan tercatat</div>
         </div>
-        <a href="{{ route('siswa.pengaduan.create') }}" class="btn btn-primary">
+        <a href="{{ route('siswa.chat.index') }}" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             Buat Pengaduan
         </a>

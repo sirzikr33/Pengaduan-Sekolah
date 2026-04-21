@@ -308,17 +308,18 @@
         {{-- Info siswa --}}
         @if(Auth::user()->siswa)
         <div class="siswa-card">
-            <div class="label">Siswa</div>
+            <div class="avatar">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
             <div class="name">{{ Auth::user()->siswa->nama }}</div>
+            <div class="user-role">{{ Auth::user()->email }}</div>
             <div class="kelas">{{ Auth::user()->siswa->kelas }}</div>
+            <div class="label">Siswa</div>
         </div>
         @endif
-
         <nav class="sidebar-nav">
             <div class="nav-label">Menu</div>
             <a href="{{ route('siswa.dashboard') }}" class="nav-item {{ request()->routeIs('siswa.dashboard') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-                Dashboard
+                Dasbor
             </a>
             <a href="{{ route('siswa.pengaduan.index') }}" class="nav-item {{ request()->routeIs('siswa.pengaduan.index') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
@@ -335,13 +336,6 @@
         </nav>
 
         <div class="sidebar-footer">
-            <div class="user-card">
-                <div class="avatar">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
-                <div class="user-info">
-                    <div class="user-name">{{ Auth::user()->name }}</div>
-                    <div class="user-role">{{ Auth::user()->email }}</div>
-                </div>
-            </div>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="logout-btn">

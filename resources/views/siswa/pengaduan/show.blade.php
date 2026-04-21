@@ -140,7 +140,18 @@
         </div>
     </div>
 
-    <div style="display:flex; gap:0.5rem; margin-top:1.5rem;">
+    <div style="display:flex; gap:0.5rem; margin-top:1.5rem; flex-wrap:wrap; align-items:center;">
         <a href="{{ route('siswa.pengaduan.index') }}" class="btn btn-ghost">← Kembali</a>
+
+        @if($pengaduan->chatSession)
+            <a href="{{ route('siswa.chat.history.show', $pengaduan->chatSession) }}"
+               class="btn btn-ghost"
+               style="border-color:rgba(59,130,246,0.3); color:#1e40af; background:rgba(59,130,246,0.05);">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;">
+                    <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                </svg>
+                Lihat Log Obrolan
+            </a>
+        @endif
     </div>
 @endsection
