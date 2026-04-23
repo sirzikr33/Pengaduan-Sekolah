@@ -329,9 +329,9 @@
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
                 Chat Pengaduan
             </a>
-            <a href="{{ route('siswa.pengaduan.create') }}" class="nav-item {{ request()->routeIs('siswa.pengaduan.create') ? 'active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                Buat Pengaduan
+            <a href="{{ route('siswa.profile.index') }}" class="nav-item {{ request()->routeIs('siswa.profile.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                Ganti Password
             </a>
         </nav>
 
@@ -352,8 +352,33 @@
                 <div class="page-title">@yield('page_title', 'Dashboard')</div>
                 <div class="breadcrumb">@yield('breadcrumb', 'Beranda')</div>
             </div>
-            <div style="font-size:0.78rem; color:var(--muted);">
-                {{ now()->translatedFormat('d F Y') }}
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="font-size:0.78rem; color:var(--muted);">{{ now()->translatedFormat('d F Y') }}</div>
+
+                {{-- Fitur 3: Lonceng Notifikasi --}}
+                <div style="position:relative;" id="notifWrapper">
+                    <button onclick="toggleNotifDropdown()" id="notifBell"
+                        style="position:relative; background:none; border:1px solid var(--border); border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background 0.15s; color:var(--muted);"
+                        title="Notifikasi">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width:17px;height:17px;">
+                            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                        </svg>
+                        <span id="notifBadge"
+                            style="display:none; position:absolute; top:-5px; right:-5px; background:#dc2626; color:#fff; font-size:0.6rem; font-weight:700; min-width:16px; height:16px; border-radius:8px; padding:0 3px; line-height:16px; text-align:center;">0</span>
+                    </button>
+
+                    {{-- Dropdown --}}
+                    <div id="notifDropdown"
+                        style="display:none; position:absolute; right:0; top:calc(100% + 8px); width:320px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 24px rgba(34,139,34,0.12); z-index:300; overflow:hidden;">
+                        <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-size:0.82rem; font-weight:600; color:var(--text);">🔔 Notifikasi</span>
+                            <button onclick="markAllRead()" style="font-size:0.72rem; color:var(--accent); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif;">Tandai semua dibaca</button>
+                        </div>
+                        <div id="notifList" style="max-height:320px; overflow-y:auto;">
+                            <div style="padding:2rem; text-align:center; color:var(--muted); font-size:0.82rem;" id="notifEmpty">Tidak ada notifikasi</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -376,5 +401,88 @@
     </div>
 
     @stack('scripts')
+
+    <script>
+    // ── Notifikasi Polling (Fitur 3) ─────────────────────────────────
+    const NOTIF_ROUTES = {
+        index:    '{{ route("siswa.notifications.index") }}',
+        markRead: '{{ route("siswa.notifications.mark-read") }}',
+        markAll:  '{{ route("siswa.notifications.mark-all") }}',
+    };
+    const CSRF_NOTIF = '{{ csrf_token() }}';
+    let notifOpen = false;
+
+    async function fetchNotifications() {
+        try {
+            const res  = await fetch(NOTIF_ROUTES.index, { headers: { 'X-CSRF-TOKEN': CSRF_NOTIF } });
+            const data = await res.json();
+            if (!data.success) return;
+
+            const badge = document.getElementById('notifBadge');
+            const list  = document.getElementById('notifList');
+            const empty = document.getElementById('notifEmpty');
+            const count = data.unread_count;
+
+            badge.style.display = count > 0 ? 'block' : 'none';
+            badge.textContent = count > 9 ? '9+' : count;
+
+            if (notifOpen) {
+                if (data.notifications.length === 0) {
+                    empty.style.display = 'block';
+                } else {
+                    empty.style.display = 'none';
+                    Array.from(list.children).forEach(c => { if (c.id !== 'notifEmpty') c.remove(); });
+                    data.notifications.forEach(n => {
+                        const el = document.createElement('a');
+                        el.href = n.data.url || '#';
+                        el.onclick = () => markOneRead(n.id);
+                        el.style.cssText = `display:block; padding:0.75rem 1rem; border-bottom:1px solid var(--border); text-decoration:none; transition:background 0.15s; background:${n.read_at ? 'transparent' : 'rgba(34,166,69,0.04)'};`;
+                        const rawMsg = (n.data.pesan || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        const time = new Date(n.created_at).toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'short' });
+                        el.innerHTML = `
+                            <div style="font-size:0.82rem; color:var(--text); line-height:1.4;">${rawMsg}${n.read_at ? '' : ' <span style="display:inline-block;width:6px;height:6px;background:#22a645;border-radius:50%;vertical-align:middle;"></span>'}</div>
+                            <div style="font-size:0.68rem; color:var(--muted); margin-top:0.25rem;">${time}</div>
+                        `;
+                        list.appendChild(el);
+                    });
+                }
+            }
+        } catch(e) {}
+    }
+
+    function toggleNotifDropdown() {
+        const dd = document.getElementById('notifDropdown');
+        notifOpen = !notifOpen;
+        dd.style.display = notifOpen ? 'block' : 'none';
+        if (notifOpen) fetchNotifications();
+    }
+
+    async function markOneRead(id) {
+        await fetch(NOTIF_ROUTES.markRead, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF_NOTIF },
+            body: JSON.stringify({ id }),
+        });
+        fetchNotifications();
+    }
+
+    async function markAllRead() {
+        await fetch(NOTIF_ROUTES.markAll, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF_NOTIF },
+        });
+        fetchNotifications();
+    }
+
+    document.addEventListener('click', e => {
+        if (!document.getElementById('notifWrapper').contains(e.target)) {
+            notifOpen = false;
+            document.getElementById('notifDropdown').style.display = 'none';
+        }
+    });
+
+    fetchNotifications();
+    setInterval(fetchNotifications, 15000);
+    </script>
 </body>
 </html>

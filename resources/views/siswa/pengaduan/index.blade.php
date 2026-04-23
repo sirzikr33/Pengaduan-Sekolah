@@ -11,8 +11,8 @@
             <div class="section-sub">{{ $pengaduans->total() }} pengaduan tercatat</div>
         </div>
         <a href="{{ route('siswa.chat.index') }}" class="btn btn-primary">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            Buat Pengaduan
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+            Lapor lewat Chat
         </a>
     </div>
 
@@ -20,7 +20,7 @@
         @if($pengaduans->isEmpty())
             <div class="empty-state">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
-                <p>Belum ada pengaduan. <a href="{{ route('siswa.pengaduan.create') }}" style="color:var(--accent);">Buat pengaduan pertama</a>.</p>
+                <p>Belum ada pengaduan. <a href="{{ route('siswa.chat.index') }}" style="color:var(--accent);">Lapor lewat Chat sekarang</a>.</p>
             </div>
         @else
             <table>

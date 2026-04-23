@@ -232,10 +232,10 @@
                 </div>
             @endif
 
-            @if($errors->has('email') && !$errors->has('password'))
+            @if($errors->has('login_id') && !$errors->has('password'))
                 <div class="alert alert-error">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                    {{ $errors->first('email') }}
+                    {{ $errors->first('login_id') }}
                 </div>
             @endif
 
@@ -243,19 +243,19 @@
                 @csrf
 
                 <div class="form-group">
-                    <label for="email">Email</label>
+                    <label for="login_id">Email atau NISN</label>
                     <div class="input-wrap">
                         <svg class="input-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                         </svg>
-                        <input type="email" id="email" name="email"
-                            value="{{ old('email') }}"
-                            placeholder="admin@sekolah.sch.id"
-                            autocomplete="email"
-                            class="{{ $errors->has('email') ? 'is-invalid' : '' }}"
+                        <input type="text" id="login_id" name="login_id"
+                            value="{{ old('login_id') }}"
+                            placeholder="Ketik email / NISN..."
+                            autocomplete="username"
+                            class="{{ $errors->has('login_id') ? 'is-invalid' : '' }}"
                             required>
                     </div>
-                    @error('email')
+                    @error('login_id')
                         <p class="error-msg">{{ $message }}</p>
                     @enderror
                 </div>

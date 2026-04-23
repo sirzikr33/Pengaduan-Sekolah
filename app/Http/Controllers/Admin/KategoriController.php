@@ -58,6 +58,12 @@ class KategoriController extends Controller
 
     public function destroy(Kategori $kategori)
     {
+        $jumlah = $kategori->pengaduans()->count();
+        if ($jumlah > 0) {
+            return redirect()->route('admin.kategori.index')
+                ->with('error', "Kategori \"{$kategori->nama_kategori}\" tidak dapat dihapus karena masih digunakan oleh {$jumlah} pengaduan.");
+        }
+
         $kategori->delete();
 
         return redirect()->route('admin.kategori.index')

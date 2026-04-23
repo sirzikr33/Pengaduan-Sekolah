@@ -73,7 +73,21 @@ class ChatController extends Controller
     {
         $user = Auth::user();
 
-        // Close any existing open sessions
+        // Bug #4 Fix: Cegah pembuatan sesi baru jika ada sesi 'active' dengan admin
+        $activeSession = ChatSession::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->first();
+
+        if ($activeSession) {
+            return response()->json([
+                'success'    => false,
+                'error'      => 'active_exists',
+                'message'    => 'Kamu masih memiliki sesi chat aktif dengan admin. Tunggu hingga admin menutup sesi tersebut sebelum memulai yang baru.',
+                'session_id' => $activeSession->id,
+            ], 409);
+        }
+
+        // Close any existing open sessions (chatbot & queued only)
         ChatSession::where('user_id', $user->id)
             ->whereIn('status', ['chatbot', 'queued'])
             ->update(['status' => 'resolved', 'resolved_at' => now()]);
@@ -205,6 +219,22 @@ class ChatController extends Controller
         $botMessages = [];
         if ($lastBotMsg && $lastBotMsg->metadata && ($lastBotMsg->metadata['step'] ?? '') === 'foto') {
             $botMessages = $this->processBotStep($session, 'foto_received', $path);
+        } else {
+            // Jika tiba-tiba mengirim foto padahal BUKAN step 'foto'
+            // 1. Hapus foto yang baru di-upload karena tidak diminta
+            if (Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+                $session->update(['photo_path' => null]);
+            }
+            
+            // 2. Loop instruksi sebelumnya
+            if ($lastBotMsg) {
+                $botMsg = $lastBotMsg->message;
+                if ($botMsg === '__SELECT_KATEGORI__') {
+                    $botMsg = 'Silakan pilih kategori masalah terlebih dahulu.';
+                }
+                $botMessages[] = $this->botMsg($session, "⚠️ Foto tidak diizinkan saat ini. Silakan merespons sesuai instruksi di bawah ini:\n\n" . $botMsg, $lastBotMsg->metadata);
+            }
         }
 
         return response()->json([
@@ -256,6 +286,22 @@ class ChatController extends Controller
             ->where('user_id', $user->id)
             ->firstOrFail();
 
+        // Bug #5 Fix: Cegah escalate jika pengaduan belum disubmit
+        if (!$session->pengaduan_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kamu belum menyelesaikan pengaduan. Lengkapi dan kirim pengaduanmu terlebih dahulu sebelum meminta bantuan admin.',
+            ], 422);
+        }
+
+        // Cegah double escalate
+        if ($session->status === 'queued' || $session->status === 'active') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kamu sudah dalam antrean atau sedang dilayani oleh admin.',
+            ], 409);
+        }
+
         $queuePos = ChatSession::where('status', 'queued')->count() + 1;
 
         $session->update([
@@ -288,7 +334,9 @@ class ChatController extends Controller
             case 'kategori':
                 $kategori = Kategori::find($value);
                 if (!$kategori) {
-                    $messages[] = $this->botMsg($session, "❌ Kategori tidak valid. Silakan pilih dari opsi yang tersedia.");
+                    $kategoris = Kategori::orderBy('nama_kategori')->get();
+                    $options = $kategoris->map(fn($k) => ['id' => $k->id, 'label' => $k->nama_kategori])->toArray();
+                    $messages[] = $this->botMsg($session, "❌ Pilihan tidak valid. Silakan pilih dari opsi yang tersedia:", ['type' => 'options', 'step' => 'kategori', 'options' => $options]);
                     break;
                 }
                 // Simpan ke database (payload_data), bukan cache
@@ -301,8 +349,15 @@ class ChatController extends Controller
                 break;
 
             case 'nama':
-                if (empty($value) || strlen($value) < 5) {
-                    $messages[] = $this->botMsg($session, "❌ Judul terlalu pendek. Minimal 5 karakter ya. Coba lagi:");
+                if (empty($value) || strlen($value) > 100) {
+                    $messages[] = $this->botMsg($session, "❌ Judul pengaduan maksimal 100 karakter. Coba persingkat judulmu:");
+                    $messages[count($messages) - 1]->metadata = ['step' => 'nama'];
+                    $messages[count($messages) - 1]->save();
+                    break;
+                }
+
+                if ($errorMsg = $this->validateChatInput($value, 2)) {
+                    $messages[] = $this->botMsg($session, $errorMsg . "\n\nCoba tuliskan kembali judul/nama pengaduan kamu:");
                     $messages[count($messages) - 1]->metadata = ['step' => 'nama'];
                     $messages[count($messages) - 1]->save();
                     break;
@@ -315,8 +370,15 @@ class ChatController extends Controller
                 break;
 
             case 'deskripsi':
-                if (empty($value) || strlen($value) < 10) {
-                    $messages[] = $this->botMsg($session, "❌ Deskripsi terlalu pendek. Minimal 10 karakter. Coba jelaskan lebih detail:");
+                if (empty($value) || strlen($value) > 1500) {
+                    $messages[] = $this->botMsg($session, "❌ Deskripsi terlalu panjang (maksimal 1500 karakter). Coba persingkat penjelasanmu:");
+                    $messages[count($messages) - 1]->metadata = ['step' => 'deskripsi'];
+                    $messages[count($messages) - 1]->save();
+                    break;
+                }
+
+                if ($errorMsg = $this->validateChatInput($value, 4)) {
+                    $messages[] = $this->botMsg($session, $errorMsg . "\n\nCoba jelaskan kembali detail permasalahannya:");
                     $messages[count($messages) - 1]->metadata = ['step' => 'deskripsi'];
                     $messages[count($messages) - 1]->save();
                     break;
@@ -329,8 +391,15 @@ class ChatController extends Controller
                 break;
 
             case 'lokasi':
-                if (empty($value)) {
-                    $messages[] = $this->botMsg($session, "❌ Lokasi tidak boleh kosong. Tulis lokasi kejadian:");
+                if (empty($value) || strlen($value) > 100) {
+                    $messages[] = $this->botMsg($session, "❌ Lokasi tidak valid atau terlalu panjang (maksimal 100 karakter). Tulis lokasi kejadian:");
+                    $messages[count($messages) - 1]->metadata = ['step' => 'lokasi'];
+                    $messages[count($messages) - 1]->save();
+                    break;
+                }
+
+                if ($errorMsg = $this->validateChatInput($value, 1)) {
+                    $messages[] = $this->botMsg($session, $errorMsg . "\n\nTuliskan kembali lokasi kejadiannya:");
                     $messages[count($messages) - 1]->metadata = ['step' => 'lokasi'];
                     $messages[count($messages) - 1]->save();
                     break;
@@ -346,7 +415,11 @@ class ChatController extends Controller
 
             case 'kondisi':
                 if (!in_array($value, ['ringan', 'sedang', 'berat'])) {
-                    $messages[] = $this->botMsg($session, "❌ Pilihan tidak valid. Pilih salah satu: Ringan, Sedang, atau Berat.");
+                    $messages[] = $this->botMsg($session, "❌ Pilihan tidak valid. Seberapa parah kondisi masalahnya?", ['type' => 'options', 'step' => 'kondisi', 'options' => [
+                        ['id' => 'ringan', 'label' => '🟢 Ringan'],
+                        ['id' => 'sedang', 'label' => '🟡 Sedang'],
+                        ['id' => 'berat',  'label' => '🔴 Berat'],
+                    ]]);
                     break;
                 }
                 $session->setPayload('kondisi', $value);
@@ -357,7 +430,15 @@ class ChatController extends Controller
                 ]]);
                 break;
 
+
             case 'ask_foto':
+                if (!in_array($value, ['ya', 'tidak'])) {
+                    $messages[] = $this->botMsg($session, "❌ Pilihan tidak valid. Apakah kamu ingin melampirkan foto bukti?", ['type' => 'options', 'step' => 'ask_foto', 'options' => [
+                        ['id' => 'ya',    'label' => '📷 Ya, lampirkan foto'],
+                        ['id' => 'tidak', 'label' => '⏭️ Tidak, lanjut saja'],
+                    ]]);
+                    break;
+                }
                 if ($value === 'ya') {
                     $messages[] = $this->botMsg($session, "📷 Silakan kirim foto bukti kamu. Kamu bisa menggunakan tombol kamera 📸 atau upload file gambar.", ['step' => 'foto']);
                 } else {
@@ -387,7 +468,10 @@ class ChatController extends Controller
                     $session->update(['status' => 'resolved', 'resolved_at' => now()]);
                     $messages[] = $this->botMsg($session, "❌ Pengaduan dibatalkan.\n\nJika kamu ingin membuat pengaduan baru, silakan mulai chat baru.");
                 } else {
-                    $messages[] = $this->botMsg($session, "Pilih \"Kirim Pengaduan\" atau \"Batalkan\".");
+                    $messages[] = $this->botMsg($session, "❌ Pilihan tidak valid. Apakah datanya sudah benar?", ['type' => 'options', 'step' => 'konfirmasi', 'options' => [
+                        ['id' => 'kirim', 'label' => '✅ Kirim Pengaduan'],
+                        ['id' => 'batal', 'label' => '❌ Batalkan'],
+                    ]]);
                 }
                 break;
 
@@ -404,6 +488,13 @@ class ChatController extends Controller
                         'queued_at'      => now(),
                     ]);
                     $messages[] = $this->botMsg($session, "🔄 Kamu sudah masuk antrean untuk berbicara dengan admin.\n\n📍 Posisi antrean: #{$queuePos}\n\nMohon tunggu ya, admin akan segera merespons.");
+                } else {
+                    $messages[] = $this->botMsg($session, "Pilihan tidak valid. Apa yang ingin kamu lakukan selanjutnya?", [
+                        'type' => 'options', 'step' => 'selesai', 'options' => [
+                            ['id' => 'baru',  'label' => '📝 Buat Pengaduan Baru'],
+                            ['id' => 'admin', 'label' => '💬 Bicara dengan Admin'],
+                        ]
+                    ]);
                 }
                 break;
 
@@ -514,5 +605,111 @@ class ChatController extends Controller
     {
         // Metode ini sekarang wrap clearPayload() untuk backward compatibility
         $session->clearPayload();
+    }
+
+    /**
+     * Peringatan idle/AFK
+     */
+    public function afkWarning(Request $request)
+    {
+        $request->validate(['session_id' => 'required|exists:chat_sessions,id']);
+
+        $user = Auth::user();
+        $session = ChatSession::where('id', $request->session_id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        if ($session->status === 'active') {
+            ChatMessage::create([
+                'chat_session_id' => $session->id,
+                'sender_type'     => 'bot',
+                'message'         => "⚠️ Kamu tidak aktif. Sesi chat ini akan otomatis ditutup dalam 2 menit jika tidak ada respons.",
+            ]);
+        }
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Auto resolve karena idle/AFK
+     */
+    public function autoResolve(Request $request)
+    {
+        $request->validate(['session_id' => 'required|exists:chat_sessions,id']);
+
+        $user = Auth::user();
+        $session = ChatSession::where('id', $request->session_id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        if ($session->status === 'active') {
+            ChatMessage::create([
+                'chat_session_id' => $session->id,
+                'sender_type'     => 'bot',
+                'message'         => "⏱️ Karena tidak ada aktivitas, sesi chat ini telah ditutup secara otomatis oleh sistem.",
+            ]);
+
+            $session->update([
+                'status'      => 'resolved',
+                'resolved_at' => now(),
+            ]);
+
+            if ($session->pengaduan_id) {
+                Pengaduan::where('id', $session->pengaduan_id)
+                    ->whereIn('status', ['pending', 'proses'])
+                    ->update(['status' => 'selesai']);
+            }
+        }
+        return response()->json(['success' => true]);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // Validasi Cerdas (Pencegah Spam & Bad Words)
+    // ════════════════════════════════════════════════════════
+
+    private function containsBadWords(string $text): bool
+    {
+        $badWords = [
+            'anjing', 'babi', 'monyet', 'bangsat', 'kontol', 'memek', 
+            'jembut', 'peler', 'ngentot', 'goblok', 'tolol', 'bego', 
+            'pantek', 'asu', 'bajingan', 'kampret', 'tai', 'puki'
+        ];
+        
+        $textLower = strtolower($text);
+        foreach ($badWords as $word) {
+            // Gunakan boundary (\b) agar tidak mendeteksi kata berimbuhan normal
+            if (preg_match('/\b' . preg_quote($word, '/') . '\b/i', $textLower)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function validateChatInput(string $text, int $minWords = 1): ?string
+    {
+        // 1. Cek kata kasar
+        if ($this->containsBadWords($text)) {
+            return "❌ Sistem mendeteksi kata yang kurang pantas. Mohon gunakan bahasa yang lebih sopan.";
+        }
+
+        // 2. Cek karakter berulang tidak wajar (misal huruf sama diulang > 4 kali: "aaaaa")
+        if (preg_match('/(.)\1{4,}/i', $text)) {
+            return "❌ Sistem mendeteksi ketikan spam (karakter berulang). Tolong ketik dengan benar.";
+        }
+
+        // 3. Cek murni angka/simbol (wajib mengandung huruf abjad A-Z)
+        if (!preg_match('/[a-zA-Z]/', $text)) {
+            return "❌ Masukan tidak valid. Tolong gunakan huruf abjad untuk menjelaskan.";
+        }
+
+        // 4. Cek jumlah kata
+        // Hapus tanda baca berlebih untuk mendapatkan kata murni
+        $cleanText = preg_replace('/[^\p{L}\p{N}\s]/u', '', $text);
+        $wordCount = str_word_count($cleanText);
+        
+        if ($wordCount < $minWords) {
+            return "❌ Masukan terlalu pendek (minimal {$minWords} kata). Tolong jelaskan lebih spesifik.";
+        }
+
+        return null; // Bebas masalah
     }
 }

@@ -139,8 +139,17 @@
     <div class="section-header">
         <div>
             <div class="section-title">Daftar Pengaduan</div>
-                <div class="section-sub">{{ $totalPengaduan }} pengaduan ditemukan</div>
+            <div class="section-sub">{{ $totalPengaduan }} pengaduan ditemukan</div>
         </div>
+        {{-- Fitur 2: Tombol Export Excel --}}
+        <a href="{{ route('admin.pengaduan.export', request()->only(['status','kondisi','search'])) }}"
+           class="btn btn-ghost btn-sm"
+           title="Export data ke Excel sesuai filter aktif">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#166534;">
+                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15l1.41-1.41L11 15.17V11h2v4.17l1.59-1.59L16 15l-4 4-4-4z"/>
+            </svg>
+            Export Excel
+        </a>
     </div>
 
     <div class="table-wrap">
@@ -184,8 +193,12 @@
                                 </td>
                                 <td>
                                     <div style="line-height:1.3;">
-                                        <div style="font-weight:500;">{{ $p->siswa->nama ?? '-' }}</div>
-                                        <div style="font-size:0.72rem; color:var(--muted);">{{ $p->siswa->kelas ?? '' }}</div>
+                                        @if($p->siswa)
+                                            <div style="font-weight:500;">{{ $p->siswa->nama ?? '-' }}</div>
+                                            <div style="font-size:0.72rem; color:var(--muted);">{{ $p->siswa->kelas ?? '' }}</div>
+                                        @else
+                                            <div style="font-weight:500; color:var(--muted);">-</div>
+                                        @endif
                                     </div>
                                 </td>
                                 <td><span class="badge badge-gray">{{ $p->kategori->nama_kategori ?? '-' }}</span></td>

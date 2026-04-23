@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
+use App\Models\Pengaduan;
+use App\Notifications\AdminChatAccepted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -67,6 +69,9 @@ class ChatController extends Controller
             'sender_type'     => 'bot',
             'message'         => "✅ Admin **" . Auth::user()->name . "** sudah menerima chat kamu. Silakan sampaikan permasalahanmu!",
         ]);
+
+        // Fitur 3: Kirim notifikasi lonceng ke siswa
+        $chatSession->user->notify(new AdminChatAccepted($chatSession, Auth::user()->name));
 
         return redirect()->route('admin.chat.show', $chatSession);
     }
@@ -148,17 +153,29 @@ class ChatController extends Controller
             'resolved_at' => now(),
         ]);
 
+        // Bug #2 Fix: Sinkronisasi status Pengaduan terkait menjadi 'selesai'
+        if ($chatSession->pengaduan_id) {
+            Pengaduan::where('id', $chatSession->pengaduan_id)
+                ->whereIn('status', ['pending', 'proses']) // Jangan overwrite jika sudah selesai
+                ->update(['status' => 'selesai']);
+        }
+
         return redirect()->route('admin.chat.index')
-            ->with('success', 'Chat berhasil diselesaikan.');
+            ->with('success', 'Chat berhasil diselesaikan dan status pengaduan diperbarui.');
     }
 
-    /**
-     * Get queue count for badge (AJAX).
-     */
     public function queueCount()
     {
+        $queuedChats = ChatSession::with(['user', 'user.siswa'])
+            ->where('status', 'queued')
+            ->orderBy('queued_at')
+            ->get();
+
+        $html = view('admin.chat._queued_list', compact('queuedChats'))->render();
+
         return response()->json([
-            'count' => ChatSession::where('status', 'queued')->count(),
+            'count' => $queuedChats->count(),
+            'html'  => $html,
         ]);
     }
 }

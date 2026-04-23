@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\PengaduanExport;
 use App\Http\Controllers\Controller;
 use App\Models\Pengaduan;
+use App\Notifications\PengaduanStatusChanged;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PengaduanController extends Controller
 {
@@ -76,13 +80,31 @@ class PengaduanController extends Controller
             'catatan.max'     => 'Catatan maksimal 2000 karakter.',
         ]);
 
+        $statusLama = $pengaduan->status;
+
         $pengaduan->update([
             'status'  => $request->status,
             'catatan' => $request->catatan,
         ]);
 
+        // Fitur 3: Kirim notifikasi ke siswa jika status berubah
+        if ($statusLama !== $request->status && $pengaduan->siswa && $pengaduan->siswa->user) {
+            $pengaduan->siswa->user->notify(new PengaduanStatusChanged($pengaduan, $statusLama));
+        }
+
         return redirect()->route('admin.pengaduan.index')
-            ->with('success', 'Pengaduan berhasil diperbarui.');
+            ->with('success', 'Pengaduan berhasil diperbarui dan siswa telah diberitahu.');
+    }
+
+    /**
+     * Fitur 2: Export rekap pengaduan ke Excel.
+     */
+    public function export(Request $request)
+    {
+        $filters = $request->only(['status', 'kondisi', 'search']);
+        $filename = 'rekap-pengaduan-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new PengaduanExport($filters), $filename);
     }
 
     /**
@@ -90,6 +112,14 @@ class PengaduanController extends Controller
      */
     public function destroy(Pengaduan $pengaduan)
     {
+        // Bug #1 Fix: Hapus file foto fisik dari storage sebelum hapus record
+        if ($pengaduan->foto_pengaduan && $pengaduan->foto_pengaduan !== 'no-image.jpg') {
+            $fotoPath = 'pengaduan/' . $pengaduan->foto_pengaduan;
+            if (Storage::disk('public')->exists($fotoPath)) {
+                Storage::disk('public')->delete($fotoPath);
+            }
+        }
+
         $pengaduan->delete();
 
         return redirect()->route('admin.pengaduan.index')

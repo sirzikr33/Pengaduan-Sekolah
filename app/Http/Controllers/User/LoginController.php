@@ -19,29 +19,45 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email'    => 'required|email',
+            'login_id' => 'required',
             'password' => 'required',
         ], [
-            'email.required'    => 'Email wajib diisi.',
-            'email.email'       => 'Format email tidak valid.',
+            'login_id.required' => 'Email atau NISN wajib diisi.',
             'password.required' => 'Password wajib diisi.',
         ]);
 
-        $credentials = $request->only('email', 'password');
-        $remember    = $request->boolean('remember');
+        $loginId  = $request->input('login_id');
+        $password = $request->input('password');
+        $remember = $request->boolean('remember');
 
-        if (Auth::attempt($credentials, $remember)) {
+        $isEmail = filter_var($loginId, FILTER_VALIDATE_EMAIL);
+        $attempt = false;
+
+        if ($isEmail) {
+            // Login langsung dengan kolom email (biasanya Admin)
+            $attempt = Auth::attempt(['email' => $loginId, 'password' => $password], $remember);
+        } else {
+            // Jika bukan email, anggap sebagai NISN (Siswa)
+            $siswa = \App\Models\Siswa::where('nisn', $loginId)->first();
+            if ($siswa) {
+                $user = \App\Models\User::where('siswa_id', $siswa->id)->first();
+                if ($user) {
+                    // Autentikasi menggunakan email user terkait yang terdaftar
+                    $attempt = Auth::attempt(['email' => $user->email, 'password' => $password], $remember);
+                }
+            }
+        }
+
+        if ($attempt) {
             $request->session()->regenerate();
-
             $user = Auth::user();
-
             return $this->redirectByRole($user)
                 ->with('success', 'Selamat datang, ' . $user->name . '!');
         }
 
         return back()
-            ->withInput($request->only('email'))
-            ->withErrors(['email' => 'Email atau password salah.']);
+            ->withInput($request->only('login_id'))
+            ->withErrors(['login_id' => 'Kombinasi akun dan password tidak sesuai.']);
     }
 
     public function logout(Request $request)
@@ -52,15 +68,11 @@ class LoginController extends Controller
         return redirect()->route('login')
             ->with('success', 'Anda berhasil logout.');
     }
-
-    /**
-     * Redirect berdasarkan role user.
-     */
     private function redirectByRole($user)
     {
         return match($user->role) {
-            'siswa' => redirect()->intended(route('siswa.dashboard')),
-            default => redirect()->intended(route('dashboard')),
+            'siswa' => redirect()->route('siswa.dashboard'),
+            default => redirect()->route('dashboard'),
         };
     }
 }

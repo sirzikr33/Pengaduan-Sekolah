@@ -127,12 +127,12 @@ class DatabaseSeeder extends Seeder
         $this->command->info('     Email : admin@sekolah.sch.id');
         $this->command->info('     Pass  : admin123');
         $this->command->info('');
-        $this->command->info('  🎓 SISWA (semua password: siswa123)');
-        $this->command->info('     zikra.malik@siswa.sch.id');
-        $this->command->info('     siti.rahmawati@siswa.sch.id');
-        $this->command->info('     budi.santoso@siswa.sch.id');
-        $this->command->info('     dewi.lestari@siswa.sch.id');
-        $this->command->info('     rizky.pratama@siswa.sch.id');
+        $this->command->info('  🎓 SISWA (Login menggunakan NISN, Password bawaan: siswa123)');
+        $this->command->info('     0123456789  (Zikra Malik)');
+        $this->command->info('     0123456790  (Siti Rahmawati)');
+        $this->command->info('     0123456791  (Budi Santoso)');
+        $this->command->info('     0123456792  (Dewi Lestari)');
+        $this->command->info('     0123456793  (Rizky Pratama)');
         $this->command->info('');
     }
 }

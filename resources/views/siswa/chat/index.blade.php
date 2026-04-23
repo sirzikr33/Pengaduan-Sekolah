@@ -567,12 +567,29 @@
         uploadPhoto:'{{ route("siswa.chat.upload-photo") }}',
         messages:   '{{ route("siswa.chat.messages") }}',
         escalate:   '{{ route("siswa.chat.escalate") }}',
+        afkWarning: '{{ route("siswa.chat.afk-warning") }}',
+        autoResolve:'{{ route("siswa.chat.auto-resolve") }}',
     };
 
     let sessionId = '{{ $session?->id ?? "" }}';
     let currentStep = null;
     let pollInterval = null;
     let lastMessageTime = null;
+
+    // AFK Tracker State
+    let idleTime = 0;
+    let afkTimer = null;
+    let hasWarnedAfk = false;
+
+    // Reset idle time when user interacts
+    function resetIdleTime() {
+        idleTime = 0;
+        hasWarnedAfk = false;
+    }
+
+    // Hapus mousemove dan scroll karena terlalu sensitif (bisa ter-reset hanya karena getaran meja)
+    document.addEventListener('keydown', resetIdleTime);
+    document.addEventListener('click', resetIdleTime);
 
     // ── Init ──
     document.addEventListener('DOMContentLoaded', function () {
@@ -590,6 +607,21 @@
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
             });
             const data = await res.json();
+
+            // Bug #4 Fix: Tangani jika ada sesi aktif dengan admin
+            if (res.status === 409 && data.error === 'active_exists') {
+                alert('⚠️ ' + data.message);
+                // Redirect ke sesi aktif yang sudah ada
+                sessionId = data.session_id;
+                document.getElementById('chatWelcome').style.display = 'none';
+                document.getElementById('chatMessages').style.display = 'flex';
+                document.getElementById('chatInputArea').style.display = 'flex';
+                document.getElementById('chatResolvedBar').classList.remove('show');
+                loadMessages();
+                startPolling();
+                return;
+            }
+
             if (data.success) {
                 sessionId = data.session_id;
                 // Reset UI
@@ -646,6 +678,8 @@
 
         input.value = '';
         const step = currentStep;
+        
+        resetIdleTime(); // Reset AFK timer saat mengirim pesan
 
         // Jika ada foto pending, upload dulu lalu kirim pesan
         if (hasPhoto) {
@@ -789,11 +823,16 @@
                 body: JSON.stringify({ session_id: sessionId }),
             });
             const data = await res.json();
-            if (data.success) {
-                document.getElementById('queueBanner').style.display = 'flex';
-                document.getElementById('queueText').textContent = `Posisi antrean: #${data.position} — Menunggu admin...`;
-                loadMessages();
+
+            if (!data.success) {
+                // Bug #5 Fix: Tampilkan pesan error dari server
+                alert('⚠️ ' + (data.message || 'Tidak dapat terhubung ke admin sekarang.'));
+                return;
             }
+
+            document.getElementById('queueBanner').style.display = 'flex';
+            document.getElementById('queueText').textContent = `Posisi antrean: #${data.position} — Menunggu admin...`;
+            loadMessages();
         } catch (e) { console.error(e); }
     }
 
@@ -859,12 +898,53 @@
                 if (data.status === 'active') {
                     document.getElementById('queueBanner').style.display = 'none';
                     document.getElementById('chatStatus').textContent = 'Terhubung dengan admin';
+                    document.getElementById('chatInputArea').style.display = 'flex';
+                    document.getElementById('chatResolvedBar').classList.remove('show');
                 } else if (data.status === 'resolved') {
                     document.getElementById('chatStatus').textContent = 'Chat selesai';
                     document.getElementById('queueBanner').style.display = 'none';
+                    // Bug #2 Follow-up: Pastikan UI resolved juga diupdate saat polling
+                    document.getElementById('chatInputArea').style.display = 'none';
+                    document.getElementById('photoPreviewBar').classList.remove('show');
+                    document.getElementById('chatResolvedBar').classList.add('show');
+                    clearInterval(pollInterval); // Hentikan polling setelah resolved
                 }
             } catch (e) {}
         }, 3000); // Poll every 3s
+        
+        // Start AFK Timer (dijalankan bersama polling, namun independen tick-nya)
+        if (afkTimer) clearInterval(afkTimer);
+        afkTimer = setInterval(() => {
+            if (!sessionId) return;
+            const statusText = document.getElementById('chatStatus').textContent;
+            
+            // Hanya aktif jika status sedang 'Terhubung dengan admin' (active)
+            if (statusText === 'Terhubung dengan admin') {
+                idleTime++;
+                
+                // Peringatan setelah 2 menit (120 detik) idle
+                if (idleTime === 20 && !hasWarnedAfk) {
+                    hasWarnedAfk = true;
+                    fetch(ROUTES.afkWarning, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                        body: JSON.stringify({ session_id: sessionId })
+                    });
+                }
+                
+                // Auto resolve setelah 4 menit (240 detik) idle
+                if (idleTime === 30) {
+                    clearInterval(afkTimer);
+                    fetch(ROUTES.autoResolve, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                        body: JSON.stringify({ session_id: sessionId })
+                    }).then(() => {
+                        loadMessages(); // reload to show resolved state
+                    });
+                }
+            }
+        }, 1000); // Timer berjalan per 1 detik
     }
 
     // ── Render Messages ──
